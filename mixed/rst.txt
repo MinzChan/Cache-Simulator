@@ -1,0 +1,89 @@
+1.cpp
+Cycle Count: 1089
+Instruction Count: 40
+CPI = 27.225
+Data Hazard = 46
+Control Hazard = 0
+Total Memory access time: 7
+Miss Rate: 0.0666667
+-----------
+2.cpp
+Cycle Count: 1089
+Instruction Count: 40
+CPI = 27.225
+Data Hazard = 46
+Control Hazard = 0
+Total Memory access time: 7
+Miss Rate: 0.0666667
+-----------
+3.cpp
+Cycle Count: 1355
+Instruction Count: 124
+CPI = 10.9274
+Data Hazard = 135
+Control Hazard = 10
+Total Memory access time: 6
+Miss Rate: 0.0189874
+-----------
+4.cpp
+Cycle Count: 1851
+Instruction Count: 174
+CPI = 10.6379
+Data Hazard = 195
+Control Hazard = 10
+Total Memory access time: 8
+Miss Rate: 0.0179372
+-----------
+5.cpp
+Cycle Count: 1946
+Instruction Count: 125
+CPI = 15.568
+Data Hazard = 137
+Control Hazard = 10
+Total Memory access time: 6
+Miss Rate: 0.0188088
+-----------
+6.cpp
+Cycle Count: 1766
+Instruction Count: 80
+CPI = 22.075
+Data Hazard = 97
+Control Hazard = 10
+Total Memory access time: 6
+Miss Rate: 0.0267857
+------------
+7.cpp
+Cycle Count: 1760
+Instruction Count: 154
+CPI = 11.4286
+Data Hazard = 175
+Control Hazard = 10
+Total Memory access time: 8
+Miss Rate: 0.0202532
+-----------
+8.cpp
+Cycle Count: 1694
+Instruction Count: 82
+CPI = 20.6585
+Data Hazard = 112
+Control Hazard = 0
+Total Memory access time: 10
+Miss Rate: 0.0458716
+------------
+9.cpp
+Cycle Count: 1065
+Instruction Count: 41
+CPI = 25.9756
+Data Hazard = 40
+Control Hazard = 0
+Total Memory access time: 6
+Miss Rate: 0.0606061
+------------
+10.cpp
+Cycle Count: 1025
+Instruction Count: 31
+CPI = 33.0645
+Data Hazard = 30
+Control Hazard = 0
+Total Memory access time: 6
+Miss Rate: 0.0779221

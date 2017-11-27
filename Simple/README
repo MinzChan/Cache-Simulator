@@ -1,0 +1,10 @@
+This file contains the code for a Cache Simulator.
+
+How to configure:
+	Change parameters in main.c: Configure().
+
+How to run:
+(1)	$ sh run.sh
+	Will compile and test 1.trace and 2.trace.
+(2)	$ make
+	$ ./sim SOME_TRACE

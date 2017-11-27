@@ -1,0 +1,8 @@
+This file contains the code for a RISCV Simulator implemented with Cache Simulator.
+
+How to configure:
+	Change parameters in Simulation.cpp: Configure().
+
+How to run:
+	$ sh run.sh xxx.c
+	Will compile and simulates how xxx.c is executed.
