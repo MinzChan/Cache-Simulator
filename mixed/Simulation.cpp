@@ -991,6 +991,11 @@ void simulate()
         /* update CPI accordingly */
         update_cpi(add_inst);
     }
+    
+    /* final write back */
+    level1.FinalCheck();
+    level2.FinalCheck();
+    level3.FinalCheck();
 }
 
 int main(int argc, char * argv[])

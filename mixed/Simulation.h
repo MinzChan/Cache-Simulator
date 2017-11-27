@@ -277,9 +277,9 @@ void print_memory(){
         }
     }
     /* canceled in fear that using cache might interfere with results */
-//    for(int i = 0; i < num; ++i){
-//        cout << setw(2) << setfill('0') << hex << (int)memory[start + i] << " ";
-//    }
+    for(int i = 0; i < num; ++i){
+        cout << setw(2) << setfill('0') << hex << (unsigned int)memory._memory[start + i] << " ";
+    }
     cout << endl;
     cout << separator << endl;
 }

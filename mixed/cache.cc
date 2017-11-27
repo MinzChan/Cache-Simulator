@@ -180,8 +180,7 @@ void Cache::ReplaceLine(CacheAddress& addr_info, char* new_line, int& time){
     /* old_line modified?(Only with WRITE_BACK policy) */
     if(line->valid == YES && (line->modified == YES && _config.write_policy == WRITE_BACK)){
         int lower_time, lower_hit;
-        uint64_t old_addr = (addr_info.tag << (addr_info.set + addr_info.offset)) |
-                            (addr_info.set << addr_info.offset);
+        uint64_t old_addr = (addr_info.tag << (_set_bit + _offset_bit)) | (addr_info.set << _offset_bit);
         char* old_line = new char[_config.line_size];
         memcpy((void*)old_line, (const void*)(line->line), _config.line_size);
         _lower->HandleRequest(old_addr, _config.line_size, WRITE, old_line, lower_hit, lower_time);
@@ -262,4 +261,18 @@ void Cache::PrintSet(CacheAddress& addr_info){
         cout << blank << "tag: " << hex << line.tag << endl;
     }
     cout << "-----------------------" << endl;
+}
+
+void Cache::FinalCheck(){
+    for(int i = 0; i < _config.set_num; ++i){
+        for(int j = 0; j < _config.associativity; ++j){
+            if(_cache[i].cache_lines[j].valid == YES && _cache[i].cache_lines[j].modified == YES){
+                uint64_t old_addr = (_cache[i].cache_lines[j].tag << (_set_bit + _offset_bit)) | (i << _offset_bit);
+                int lower_hit, lower_time;
+                char* old_line = new char[_config.line_size];
+                memcpy((void*)old_line, (const void*)(_cache[i].cache_lines[j].line), _config.line_size);
+                _lower->HandleRequest(old_addr, _config.line_size, WRITE, old_line, lower_hit, lower_time);
+            }
+        }
+    }
 }

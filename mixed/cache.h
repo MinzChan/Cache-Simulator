@@ -61,7 +61,8 @@ class Cache: public Storage {
         // Main access process
         void HandleRequest(uint64_t addr, int bytes, int read,
                          char *content, int &hit, int &time);
-
+        void FinalCheck();
+    
     private:
         CacheAddress SetAddrInfo(uint64_t addr);
         uint64_t getbit(uint64_t addr,int s,int e);
