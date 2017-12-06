@@ -37,17 +37,17 @@ void Configure(){
     StorageLatency l1, l2, l3;
     CacheConfig cfg1, cfg2, cfg3;
     l1.bus_latency = 0;
-    l1.hit_latency = 1;
+    l1.hit_latency = 4;
     cfg1.size = (1 << 15);
     cfg1.associativity = 8;
     cfg1.line_size = 64;
     cfg1.write_policy = WRITE_BACK;
     cfg1.write_allocate_policy = WRITE_ALLOCATE;
     cfg1.replace_policy = LFU;
-    cfg1.prefetch_num = 0;
+    cfg1.prefetch_num = 2;
     
     l2.bus_latency = 6;
-    l2.hit_latency = 8;
+    l2.hit_latency = 5;
     cfg2.size = (1 << 18);
     cfg2.associativity = 8;
     cfg2.line_size = 64;
@@ -75,7 +75,7 @@ void HandleTrace(const char* trace){
     ifstream fin;
     
     fin.open(trace);
-    while(fin >> request >> hex >> addr){
+    while(fin >> request >> dec >> addr){
         if(request == "r"){
             level1.HandleRequest(addr, 4, READ, content, hit, time, YES);
         }
@@ -103,33 +103,17 @@ int main(int argc, char * argv[]) {
     Configure();
     HandleTrace(trace);
     
-    /* Used to tell the difference between three write policies */
-//    for(int i = 6;i <= 10; ++i){
-//        cout << "line_size: " << (1 << i) << endl;
-//        level1.ReleaseCache();
-//        ConfigureCache(1 << i);
-//        level1.BuildCache();
-//        HandleTrace(trace);
-//        cout << "Miss Rate: " << 1 - (float)hit_cnt / request_cnt << endl;
-//        StorageStats s;
-//        int rst = 0;
-//        level1.GetStats(s);
-//        printf("Total l1 access time: %dns\n", s.access_time);
-//        rst += s.access_time;
-//        memory.GetStats(s);
-//        printf("Total Memory access time: %dns\n", s.access_time);
-//        rst += s.access_time;
-//        cout << "ACCESS TIME: "<< rst << endl;
-//        cout << "---------" << endl;
-//    }
-    
-//    StorageStats s;
-//    level1.GetStats(s);
-    printf("Total L1 access time: %dns\n", s.access_time);
-//    memory.GetStats(s);
-//    printf("Total Memory access time: %dns\n", s.access_time);
+    StorageStats s;
+    level1.GetStats(s);
+    printf("Total L1 access time: %d(cycles)\n", s.access_time);
+    cout << "L1 miss rate: " << level1.CalculateMissRate() * 100 << "%" << endl;
+    level2.GetStats(s);
+    printf("Total L2 access time: %d(cycles)\n", s.access_time);
+    cout << "L2 miss rate: " << level2.CalculateMissRate() * 100 << "%" << endl;
+    //    memory.GetStats(s);
+    //    printf("Total Memory access time: %dns\n", s.access_time);
     printf("Total Memory access cnt: %d\n", memory._visit_cnt);
-    cout << "Miss Rate: " << 1 - (float)hit_cnt / request_cnt << endl;
-//    cout << "Miss time: " << request_cnt - hit_cnt << endl;
+    cout << "Miss Rate: " << (1 - (float)hit_cnt / request_cnt) * 100 << "%" << endl;
+    //    cout << "Miss time: " << request_cnt - hit_cnt << endl;
     return 0;
 }

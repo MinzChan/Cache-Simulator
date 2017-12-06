@@ -51,6 +51,8 @@ class Cache: public Storage {
         Cache(){
             /* initialize time stamp */
             _time_stamp = 0;
+            _total_hit = 0;
+            _total_visit = 0;
         }
     
         ~Cache(){
@@ -67,6 +69,9 @@ class Cache: public Storage {
         // Main access process
         void HandleRequest(uint64_t addr, int bytes, int read,
                          char *content, int &hit, int &time, int calculate_time);
+        double CalculateMissRate() {
+            return 1 - (double)_total_hit / _total_visit;
+        }
 
     private:
         CacheAddress SetAddrInfo(uint64_t addr);
@@ -82,6 +87,9 @@ class Cache: public Storage {
         CacheSet* GetCacheSet(CacheAddress& addr_info);
         void PrintSet(CacheAddress& addr_info);
         void FinalCheck();
+        void PrefetchStrategy(uint64_t addr);
+        int BypassCondition(CacheAddress& addr_info);
+        void LoadLineFromLower(uint64_t addr, CacheAddress& addr_info, int& lower_hit, int& lower_time, int calculate_time);
     
         CacheSet* _cache;
         CacheConfig _config;
@@ -92,6 +100,8 @@ class Cache: public Storage {
         int _offset_bit;
         int _set_bit;
         uint64_t _time_stamp;  // used for counting
+        int _total_visit;  // total visit in current cache
+        int _total_hit;  // total hit cnt in current cache
 };
 
 #endif //CACHE_CACHE_H_ 

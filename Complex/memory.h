@@ -14,7 +14,8 @@ class Memory: public Storage {
         ~Memory(){ }
         int _visit_cnt;
         // Main access process
-        void HandleRequest(uint64_t addr, int bytes, int read, char *content, int &hit, int &time);
+        void HandleRequest(uint64_t addr, int bytes, int read, char *content,
+                           int &hit, int &time, int calculate_time);
 
     private:
         // Memory implement

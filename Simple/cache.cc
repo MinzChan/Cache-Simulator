@@ -126,6 +126,10 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
 #ifdef DEBUG
     PrintSet(addr_info);
 #endif
+    
+    /* update visit status */
+    _total_visit += 1;
+    _total_hit += hit;
 }
 
 void Cache::SetConfig(CacheConfig cfg){

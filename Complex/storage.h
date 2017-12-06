@@ -20,7 +20,7 @@ typedef struct StorageStats_ {
 
 // Storage basic config
 typedef struct StorageLatency_ {
-    int hit_latency; // In nanoseconds
+    int hit_latency; // In cycles
     int bus_latency; // Added to each request
 } StorageLatency;
 
@@ -42,7 +42,9 @@ class Storage {
         // [i|o] content: in|out data
         // [out] hit: 0|1 for miss|hit
         // [out] time: total access time
-        virtual void HandleRequest(uint64_t addr, int bytes, int read, char *content, int &hit, int &time) = 0;
+        // [in] calculate_time: whether to calculate time of this visit or not.(prefetch does not need time)
+        virtual void HandleRequest(uint64_t addr, int bytes, int read, char *content,
+                                   int &hit, int &time, int calculate_time) = 0;
 
     protected:
         StorageStats _stats;

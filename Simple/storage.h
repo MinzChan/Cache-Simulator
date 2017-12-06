@@ -20,7 +20,7 @@ typedef struct StorageStats_ {
 
 // Storage basic config
 typedef struct StorageLatency_ {
-    int hit_latency; // In nanoseconds
+    int hit_latency; // cycles
     int bus_latency; // Added to each request
 } StorageLatency;
 
