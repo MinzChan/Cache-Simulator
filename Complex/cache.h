@@ -78,6 +78,7 @@ class Cache: public Storage {
         uint64_t getbit(uint64_t addr,int s,int e);
         int CacheHit(CacheAddress& addr_info);
         int FoundEmptyLine(CacheAddress& addr_info);
+        void FindReplacement(CacheAddress& addr_info);
         void FindLRU(CacheAddress& addr_info);
         void FindLFU(CacheAddress& addr_info);
         void ReplaceLine(CacheAddress& addr_info, char* new_line, int& time);

@@ -76,6 +76,7 @@ void HandleTrace(const char* trace){
     
     fin.open(trace);
     while(fin >> request >> dec >> addr){
+//        cout << request << " " << dec << addr << endl;
         if(request == "r"){
             level1.HandleRequest(addr, 4, READ, content, hit, time, YES);
         }

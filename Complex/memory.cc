@@ -8,7 +8,7 @@ void Memory::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
                            char *content, int &hit, int &time, int calculate_time) {
     hit = 1;
     _visit_cnt += 1;
-//    cout << "memory request: " << hex << addr << endl;
+//    cout << "memory request: " << dec << addr << endl;
     
     if(calculate_time){
         time = _latency.hit_latency + _latency.bus_latency;

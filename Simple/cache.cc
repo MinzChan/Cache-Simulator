@@ -243,14 +243,14 @@ void Cache::ReplaceLine(CacheAddress& addr_info, char* new_line, int& time){
         uint64_t old_addr = (addr_info.tag << (addr_info.set + addr_info.offset)) |
                             (addr_info.set << addr_info.offset);
         char* old_line = new char[_config.line_size];
-        memcpy((void*)old_line, (const void*)(line->line), _config.line_size);
+        // memcpy((void*)old_line, (const void*)(line->line), _config.line_size);
         _lower->HandleRequest(old_addr, _config.line_size, WRITE, old_line, lower_hit, lower_time);
         delete []old_line;
         time += lower_time;
     }
     
     /* replace with new line, set status */
-    memcpy((void*)(line->line), new_line, _config.line_size);
+    // memcpy((void*)(line->line), new_line, _config.line_size);
     line->valid = YES;
     line->tag = addr_info.tag;
     line->modified = NO;
@@ -259,7 +259,7 @@ void Cache::ReplaceLine(CacheAddress& addr_info, char* new_line, int& time){
 /* read 'byte_num' bytes from cache and stores in 'content' */
 void Cache::ReadFromCache(CacheAddress& addr_info, int byte_num, char* content){
     CacheLine* line = GetCacheLine(addr_info);
-    memcpy((void*)content, (const void*)((line->line) + addr_info.offset), byte_num);
+    // memcpy((void*)content, (const void*)((line->line) + addr_info.offset), byte_num);
     line->time_stamp = _time_stamp;
     _time_stamp += 1;
 }
@@ -267,7 +267,7 @@ void Cache::ReadFromCache(CacheAddress& addr_info, int byte_num, char* content){
 /* store 'byte_num' bytes in content into cache */
 void Cache::WriteToCache(CacheAddress& addr_info, int byte_num, char* content){
     CacheLine* line = GetCacheLine(addr_info);
-    memcpy((void*)((line->line) + addr_info.offset), (const void*)content, byte_num);
+    // memcpy((void*)((line->line) + addr_info.offset), (const void*)content, byte_num);
     line->time_stamp = _time_stamp;
     _time_stamp += 1;
     line->modified = YES;

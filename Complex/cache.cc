@@ -22,6 +22,9 @@
  8、在一开始的策略里面，设置好如果要prefetch的话，需要prefetch几块
  9、一开始也要对cache设置好替换策略
  10、还有一个问题，prefetch的时候，怎么让下层也不算那些数啥的
+ 11、蜜汁seg fault
+ 12、还有一个问题。loadlinefromlower之前，得判断一下这个块是不是在当前的cache里面吧'
+     明白了。bypass的时候，再readfromcache好像会有问题。因为getcacheline的时候有问题。因为没有更新index，我猜。
  */
 #include <iostream>
 #include "cache.h"
@@ -34,6 +37,7 @@ using namespace std;
 void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
                           char *content, int &hit, int &time, int calculate_time) {
     int lower_hit, lower_time;
+    int bypassed = NO;
     time = 0;
     CacheAddress addr_info = SetAddrInfo(addr);
     
@@ -46,9 +50,10 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
             if(!FoundEmptyLine(addr_info) && BypassCondition(addr_info)){
                 /* Request the line directly from memory */
                 _mem->HandleRequest(addr, byte_num, READ, content, lower_hit, lower_time, YES);
+                bypassed = YES;
             }
             else{
-                /* Request the line directly from memory */
+                /* Request the line from lower layer */
                 LoadLineFromLower(addr, addr_info, lower_hit, lower_time, YES);
             }
             
@@ -66,8 +71,9 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
                 _stats.access_time += time;
             }
         }
-        
-        ReadFromCache(addr_info, byte_num, content);
+        if(!bypassed){
+            ReadFromCache(addr_info, byte_num, content);
+        }
     }
     else if(read_or_write == WRITE){
         /* Hit */
@@ -98,6 +104,8 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
             PrefetchStrategy(addr);
             
             if(!FoundEmptyLine(addr_info) && BypassCondition(addr_info)){
+                bypassed = YES;
+                
                 /* Request the line directly from memory */
                 _mem->HandleRequest(addr, byte_num, WRITE, content, lower_hit, lower_time, YES);
                 
@@ -273,14 +281,14 @@ void Cache::ReplaceLine(CacheAddress& addr_info, char* new_line, int& time){
         uint64_t old_addr = (addr_info.tag << (addr_info.set + addr_info.offset)) |
                             (addr_info.set << addr_info.offset);
         char* old_line = new char[_config.line_size];
-        memcpy((void*)old_line, (const void*)(line->line), _config.line_size);
+        // memcpy((void*)old_line, (const void*)(line->line), _config.line_size);
         _lower->HandleRequest(old_addr, _config.line_size, WRITE, old_line, lower_hit, lower_time, YES);
         delete []old_line;
         time += lower_time;
     }
     
     /* replace with new line, set status */
-    memcpy((void*)(line->line), new_line, _config.line_size);
+    // memcpy((void*)(line->line), new_line, _config.line_size);
     line->valid = YES;
     line->tag = addr_info.tag;
     line->modified = NO;
@@ -290,16 +298,16 @@ void Cache::ReplaceLine(CacheAddress& addr_info, char* new_line, int& time){
 /* read 'byte_num' bytes from cache and stores in 'content' */
 void Cache::ReadFromCache(CacheAddress& addr_info, int byte_num, char* content){
     CacheLine* line = GetCacheLine(addr_info);
-    memcpy((void*)content, (const void*)((line->line) + addr_info.offset), byte_num);
+    // memcpy((void*)content, (const void*)((line->line) + addr_info.offset), byte_num);
     line->time_stamp = _time_stamp;
-    line->visit_cnt += 1;
     _time_stamp += 1;
+    line->visit_cnt += 1;
 }
 
 /* store 'byte_num' bytes in content into cache */
 void Cache::WriteToCache(CacheAddress& addr_info, int byte_num, char* content){
     CacheLine* line = GetCacheLine(addr_info);
-    memcpy((void*)((line->line) + addr_info.offset), (const void*)content, byte_num);
+    // memcpy((void*)((line->line) + addr_info.offset), (const void*)content, byte_num);
     line->time_stamp = _time_stamp;
     line->visit_cnt += 1;
     _time_stamp += 1;
@@ -364,7 +372,7 @@ void Cache::FinalCheck(){
                 uint64_t old_addr = (_cache[i].cache_lines[j].tag << (_set_bit + _offset_bit)) | (i << _offset_bit);
                 int lower_hit, lower_time;
                 char* old_line = new char[_config.line_size];
-                memcpy((void*)old_line, (const void*)(_cache[i].cache_lines[j].line), _config.line_size);
+                // memcpy((void*)old_line, (const void*)(_cache[i].cache_lines[j].line), _config.line_size);
                 _lower->HandleRequest(old_addr, _config.line_size, WRITE, old_line, lower_hit, lower_time, NO);
                 delete []old_line;
             }
@@ -376,17 +384,26 @@ void Cache::FinalCheck(){
 void Cache::PrefetchStrategy(uint64_t addr){
 //    cout << "In Prefetch()" << endl;
     uint64_t current_addr = addr & ~((1 << _offset_bit) - 1);  // the starting addr of current line addr is in
-    int lower_hit, lower_time;
-    for(int i = 0; i < _config.prefetch_num; ++i){
+    int lower_hit, lower_time, i = 0;
+    while(i < _config.prefetch_num){
         current_addr += _config.line_size;
         CacheAddress addr_info = SetAddrInfo(current_addr);
-        LoadLineFromLower(current_addr, addr_info, lower_hit, lower_time, NO);
+        if(!CacheHit(addr_info)){
+            LoadLineFromLower(current_addr, addr_info, lower_hit, lower_time, NO);
+            i++;
+            
+            /* record in visited_tags */
+            CacheSet* cache_set = GetCacheSet(addr_info);
+            cache_set->visited_tags.insert(addr_info.tag);
+        }
+//        i++;
     }
 }
 
 /* Meet bypass conditions or not */
 int Cache::BypassCondition(CacheAddress& addr_info){
-    // cout << "In Bypass()" << endl;
+    return NO;
+//    cout << "In Bypass()" << endl;
     CacheSet* cache_set = GetCacheSet(addr_info);
     if(cache_set->visited_tags.find(addr_info.tag) != cache_set->visited_tags.end()){  // visited this line before
         return NO;
@@ -397,19 +414,24 @@ int Cache::BypassCondition(CacheAddress& addr_info){
 /* Load a line into current cache from lower layer */
 void Cache::LoadLineFromLower(uint64_t addr, CacheAddress& addr_info,
                               int& lower_hit, int& lower_time, int calculate_time){
+//    cout << "in LoadLineFromLower()"<< endl;
     char* new_line = new char[_config.line_size];  // used to store the new block returned from lower cache
     uint64_t new_addr = addr & ~((1 << _offset_bit) - 1);  // the starting addr of the line
     _lower->HandleRequest(new_addr, _config.line_size, READ, new_line, lower_hit, lower_time, calculate_time);
     
     if(!FoundEmptyLine(addr_info)){
-        if(_config.replace_policy == LRU){
-            FindLRU(addr_info);
-        }
-        else if(_config.replace_policy == LFU){
-            FindLFU(addr_info);
-        }
+        FindReplacement(addr_info);
     }
     ReplaceLine(addr_info, new_line, lower_time);
     
     delete []new_line;
+}
+
+void Cache::FindReplacement(CacheAddress& addr_info){
+    if(_config.replace_policy == LRU){
+        FindLRU(addr_info);
+    }
+    else if(_config.replace_policy == LFU){
+        FindLFU(addr_info);
+    }
 }
