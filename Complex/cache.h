@@ -4,6 +4,7 @@
 #include <iostream>
 #include <stdint.h>
 #include <set>
+#include <string>
 #include "storage.h"
 using namespace std;
 
@@ -51,11 +52,12 @@ typedef struct CacheAddress_{
 
 class Cache: public Storage {
 public:
-    Cache(){
+    Cache(string name){
         /* initialize time stamp */
         _time_stamp = 0;
         _total_hit = 0;
         _total_visit = 0;
+        _name = name;
     }
 
     ~Cache(){
@@ -114,6 +116,7 @@ private:
     uint64_t _time_stamp;  // used for counting
     int _total_visit;  // total visit in current cache
     int _total_hit;  // total hit cnt in current cache
+    string _name;
 };
 
 #endif //CACHE_CACHE_H_ 

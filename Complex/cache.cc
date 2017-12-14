@@ -28,7 +28,8 @@
  13、得到一个line的起始地址！
  14、每次访问就要更新所有valid line里面的recency啥的。
  15、再次访问到同一个块时（hit），更新irr
- */
+ 16、因为有prefetch，所以有特别多的访问，也有特别多的set操作，这就很僵硬啊。prefetch的时候不更新set吧。 
+*/
 #include <iostream>
 #include "cache.h"
 #include "def.h"
@@ -36,8 +37,9 @@ using namespace std;
 
 #define INF 10000000
 // #define DEBUG
-//#define PREFETCH
-//#define BYPASS
+#define PREFETCH
+#define BYPASS
+//#define LOG
 
 /* asked for 'byte_num' bytes starting from addr */
 void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
@@ -46,14 +48,16 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
     int bypassed = NO;
     time = 0;
     CacheAddress addr_info = SetAddrInfo(addr);
-    UpdateAllLIRS(addr_info);
-    
+    if(calculate_time == YES){
+        UpdateAllLIRS(addr_info);
+    }
     if(read_or_write == READ){
         /* Missed */
         if(!CacheHit(addr_info)){
             hit = NO;
-            PrefetchStrategy(addr);
-            
+            if(calculate_time == YES){
+                PrefetchStrategy(addr);
+            }
             if(!FoundEmptyLine(addr_info) && BypassCondition(addr_info)){
                 /* Request the line directly from memory */
                 _mem->HandleRequest(addr, byte_num, READ, content, lower_hit, lower_time, YES);
@@ -72,8 +76,9 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
         /* Hit */
         else{
             hit = YES;
-            UpdateLIRS(addr_info);
-            
+            if(calculate_time == YES){
+                UpdateLIRS(addr_info);
+            }
             if(calculate_time){
                 time += _latency.bus_latency + _latency.hit_latency;
                 _stats.access_time += time;
@@ -158,8 +163,10 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
     cache_set->visited_tags.insert(addr_info.tag);
     
     /* update visit status */
-    _total_visit += 1;
-    _total_hit += hit;
+    if(calculate_time == YES){
+        _total_visit += 1;
+        _total_hit += hit;
+    }
 }
 
 void Cache::SetConfig(CacheConfig cfg){
@@ -274,12 +281,19 @@ void Cache::FindLFU(CacheAddress& addr_info){
 }
 
 void Cache::FindLIRS(CacheAddress& addr_info){
+#ifdef LOG
+    cout << "[" << _name << "]: In FindLIRS()" << endl;
+#endif
     int pos = 0;
     uint64_t max_IRR = 0;
     uint64_t max_recency = 0;
     CacheSet* cache_set = GetCacheSet(addr_info);
     for(int i = 0; i < _config.associativity; ++i){
         CacheLine line = *((cache_set->cache_lines) + i);
+        if(line.IRR == INF){
+            pos = i;
+            break;
+        }
         if(line.IRR > max_IRR || (line.IRR == max_IRR && line.recency > max_recency)){
             max_IRR = line.IRR;
             max_recency = line.recency;
@@ -297,11 +311,14 @@ uint64_t Cache::GetAddrOfLine(CacheAddress& addr_info){
 
 /* store the new line into current cache, might not be replacement */
 void Cache::ReplaceLine(CacheAddress& addr_info, char* new_line, int& time){
+#ifdef LOG
+    cout << "[" << _name << "]: in ReplaceLine()" << endl;
+#endif
     CacheLine* line = GetCacheLine(addr_info);
 
-#ifdef DEBUG
+#ifdef LOG
     if(line->valid == YES){
-         cout << "[Cache]: Replace " << hex << line->tag << " with " << addr_info.tag << endl;
+         cout << "[" << _name << "]: Replace " << hex << line->tag << " with " << addr_info.tag << endl;
     }
 #endif
     
@@ -429,7 +446,9 @@ void Cache::PrefetchStrategy(uint64_t addr){
 #ifndef PREFETCH
     return;
 #endif
-//    cout << "In Prefetch()" << endl;
+#ifdef LOG
+    cout << "[" << _name << "]: In Prefetch()" << endl;
+#endif
     uint64_t current_addr = addr & ~((1 << _offset_bit) - 1);  // the starting addr of current line addr is in
     int lower_hit, lower_time, i = 0;
     while(i < _config.prefetch_num){
@@ -452,7 +471,9 @@ int Cache::BypassCondition(CacheAddress& addr_info){
 #ifndef BYPASS
     return NO;
 #endif
-//    cout << "In Bypass()" << endl;
+#ifdef LOG
+    cout << "[" << _name << "]: In BypassCheck()" << endl;
+#endif
     CacheSet* cache_set = GetCacheSet(addr_info);
     if(cache_set->visited_tags.find(addr_info.tag) != cache_set->visited_tags.end()){  // visited this line before
         return NO;
@@ -463,7 +484,9 @@ int Cache::BypassCondition(CacheAddress& addr_info){
 /* Load a line into current cache from lower layer */
 void Cache::LoadLineFromLower(uint64_t addr, CacheAddress& addr_info,
                               int& lower_hit, int& lower_time, int calculate_time){
-//    cout << "in LoadLineFromLower()"<< endl;
+#ifdef LOG
+    cout << "[" << _name << "]: in LoadLineFromLower()"<< endl;
+#endif
     char* new_line = new char[_config.line_size];  // used to store the new block returned from lower cache
     uint64_t new_addr = addr & ~((1 << _offset_bit) - 1);  // the starting addr of the line
     _lower->HandleRequest(new_addr, _config.line_size, READ, new_line, lower_hit, lower_time, calculate_time);
@@ -502,6 +525,9 @@ double Cache::AMAT(){
 
 /* cache hit and update IRR and recency */
 void Cache::UpdateLIRS(CacheAddress& addr_info){
+#ifdef LOG
+    cout << "[" << _name << "]: Update LIRS after HIT." << endl;
+#endif
     CacheLine* line = GetCacheLine(addr_info);
     line->IRR = line->visited_lines.size();
     line->recency = 0;
@@ -510,7 +536,9 @@ void Cache::UpdateLIRS(CacheAddress& addr_info){
 
 /* update all cache lines' IRR and recency for a line visit */
 void Cache::UpdateAllLIRS(CacheAddress& addr_info){
-    cout << "[Cache]: Update all LIRS." << endl;
+#ifdef LOG
+    cout << "[" << _name << "]: Update all LIRS." << endl;
+#endif
     uint64_t old_addr = GetAddrOfLine(addr_info);
     for(int i = 0; i < _config.set_num; ++i){
         for(int j = 0; j < _config.associativity; ++j){

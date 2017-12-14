@@ -10,7 +10,7 @@ using namespace std;
 
 /* Memory and Cache */
 Memory memory;
-Cache level1, level2;
+Cache level1("Level1"), level2("Level2");
 
 /* Counting */
 int hit_cnt = 0;
