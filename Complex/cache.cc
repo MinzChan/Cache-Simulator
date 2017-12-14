@@ -37,25 +37,28 @@ using namespace std;
 
 #define INF 10000000
 // #define DEBUG
+//#define LOG
 #define PREFETCH
 #define BYPASS
-//#define LOG
+#define USE_LIRS
 
 /* asked for 'byte_num' bytes starting from addr */
 void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
-                          char *content, int &hit, int &time, int calculate_time) {
+                          char *content, int &hit, int &time, int not_prefetch) {
     int lower_hit, lower_time;
     int bypassed = NO;
     time = 0;
     CacheAddress addr_info = SetAddrInfo(addr);
-    if(calculate_time == YES){
+    if(not_prefetch){
+#ifdef USE_LIRS
         UpdateAllLIRS(addr_info);
+#endif
     }
     if(read_or_write == READ){
         /* Missed */
         if(!CacheHit(addr_info)){
             hit = NO;
-            if(calculate_time == YES){
+            if(not_prefetch){ // ？？？
                 PrefetchStrategy(addr);
             }
             if(!FoundEmptyLine(addr_info) && BypassCondition(addr_info)){
@@ -68,7 +71,7 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
                 LoadLineFromLower(addr, addr_info, lower_hit, lower_time, YES);
             }
             
-            if(calculate_time){
+            if(not_prefetch){
                 time += _latency.bus_latency + _latency.hit_latency + lower_time;
                 _stats.access_time += _latency.bus_latency + _latency.hit_latency;
             }
@@ -76,10 +79,12 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
         /* Hit */
         else{
             hit = YES;
-            if(calculate_time == YES){
+            if(not_prefetch){
+#ifdef USE_LIRS
                 UpdateLIRS(addr_info);
+#endif
             }
-            if(calculate_time){
+            if(not_prefetch){
                 time += _latency.bus_latency + _latency.hit_latency;
                 _stats.access_time += time;
             }
@@ -92,19 +97,22 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
         /* Hit */
         if(CacheHit(addr_info)){
             hit = YES;
-            UpdateLIRS(addr_info);
-            
+            if(not_prefetch){
+#ifdef USE_LIRS
+                UpdateLIRS(addr_info);
+#endif
+            }
             if(_config.write_policy == WRITE_THROUGH){
                 /* write directly to lower layer */
                 _lower->HandleRequest(addr, byte_num, WRITE, content, lower_hit, lower_time, YES);
                 
-                if(calculate_time){
+                if(not_prefetch){
                     time += _latency.bus_latency + _latency.hit_latency + lower_time;
                     _stats.access_time += _latency.bus_latency + _latency.hit_latency;
                 }
             }
             else if(_config.write_policy == WRITE_BACK){
-                if(calculate_time){
+                if(not_prefetch){
                     time += _latency.bus_latency + _latency.hit_latency;
                     _stats.access_time += time;
                 }
@@ -115,7 +123,9 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
         /* Missed */
         else{
             hit = NO;
-            PrefetchStrategy(addr);
+            if(not_prefetch){ // ？？？
+                PrefetchStrategy(addr);
+            }
             
             if(!FoundEmptyLine(addr_info) && BypassCondition(addr_info)){
                 bypassed = YES;
@@ -123,7 +133,7 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
                 /* Request the line directly from memory */
                 _mem->HandleRequest(addr, byte_num, WRITE, content, lower_hit, lower_time, YES);
                 
-                if(calculate_time){
+                if(not_prefetch){
                     time += _latency.bus_latency + _latency.hit_latency + lower_time;
                     _stats.access_time += _latency.bus_latency + _latency.hit_latency;
                 }
@@ -134,7 +144,7 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
                     LoadLineFromLower(addr, addr_info, lower_hit, lower_time, YES);
                     WriteToCache(addr_info, byte_num, content);
                     
-                    if(calculate_time){
+                    if(not_prefetch){
                         time += _latency.bus_latency + _latency.hit_latency + lower_time;
                         _stats.access_time += _latency.bus_latency + _latency.hit_latency;
                     }
@@ -143,7 +153,7 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
                     /* write to lower layer but not current layer */
                     _lower->HandleRequest(addr, byte_num, WRITE, content, lower_hit, lower_time, YES);
                     
-                    if(calculate_time){
+                    if(not_prefetch){
                         time += _latency.bus_latency + _latency.hit_latency;
                         _stats.access_time += time;
                     }
@@ -163,7 +173,7 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
     cache_set->visited_tags.insert(addr_info.tag);
     
     /* update visit status */
-    if(calculate_time == YES){
+    if(not_prefetch){
         _total_visit += 1;
         _total_hit += hit;
     }
@@ -343,9 +353,11 @@ void Cache::InitializeLine(CacheLine* line){
     // memcpy((void*)(line->line), new_line, _config.line_size);
     line->valid = NO;
     line->modified = NO;
+#ifdef USE_LIRS
     line->IRR = INF;
     line->recency = 0;
     line->visited_lines.clear();
+#endif
 }
 
 /* Turn a line from invalid to valid */
@@ -483,13 +495,13 @@ int Cache::BypassCondition(CacheAddress& addr_info){
 
 /* Load a line into current cache from lower layer */
 void Cache::LoadLineFromLower(uint64_t addr, CacheAddress& addr_info,
-                              int& lower_hit, int& lower_time, int calculate_time){
+                              int& lower_hit, int& lower_time, int not_prefetch){
 #ifdef LOG
     cout << "[" << _name << "]: in LoadLineFromLower()"<< endl;
 #endif
     char* new_line = new char[_config.line_size];  // used to store the new block returned from lower cache
     uint64_t new_addr = addr & ~((1 << _offset_bit) - 1);  // the starting addr of the line
-    _lower->HandleRequest(new_addr, _config.line_size, READ, new_line, lower_hit, lower_time, calculate_time);
+    _lower->HandleRequest(new_addr, _config.line_size, READ, new_line, lower_hit, lower_time, not_prefetch);
     
     if(!FoundEmptyLine(addr_info)){
         FindReplacement(addr_info);

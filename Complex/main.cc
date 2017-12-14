@@ -43,7 +43,7 @@ void Configure(){
     cfg1.line_size = 64;
     cfg1.write_policy = WRITE_BACK;
     cfg1.write_allocate_policy = WRITE_ALLOCATE;
-    cfg1.replace_policy = LIRS;
+    cfg1.replace_policy = LFU;
     cfg1.prefetch_num = 2;
     
     l2.bus_latency = 6;
@@ -53,7 +53,7 @@ void Configure(){
     cfg2.line_size = 64;
     cfg2.write_policy = WRITE_BACK;
     cfg2.write_allocate_policy = WRITE_ALLOCATE;
-    cfg2.replace_policy = LIRS;
+    cfg2.replace_policy = LFU;
     cfg2.prefetch_num = 4;
     
     level1.SetLatency(l1);
@@ -76,7 +76,7 @@ void HandleTrace(const char* trace){
     
     fin.open(trace);
     while(fin >> request >> hex >> addr){
-        cout << request << " " << hex << addr << endl;
+        // cout << request << " " << hex << addr << endl;
         if(request == "r"){
             level1.HandleRequest(addr, 4, READ, content, hit, time, YES);
         }
