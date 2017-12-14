@@ -25,13 +25,19 @@
  11、蜜汁seg fault
  12、还有一个问题。loadlinefromlower之前，得判断一下这个块是不是在当前的cache里面吧'
      明白了。bypass的时候，再readfromcache好像会有问题。因为getcacheline的时候有问题。因为没有更新index，我猜。
+ 13、得到一个line的起始地址！
+ 14、每次访问就要更新所有valid line里面的recency啥的。
+ 15、再次访问到同一个块时（hit），更新irr
  */
 #include <iostream>
 #include "cache.h"
 #include "def.h"
 using namespace std;
 
+#define INF 10000000
 // #define DEBUG
+//#define PREFETCH
+//#define BYPASS
 
 /* asked for 'byte_num' bytes starting from addr */
 void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
@@ -40,6 +46,7 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
     int bypassed = NO;
     time = 0;
     CacheAddress addr_info = SetAddrInfo(addr);
+    UpdateAllLIRS(addr_info);
     
     if(read_or_write == READ){
         /* Missed */
@@ -65,6 +72,7 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
         /* Hit */
         else{
             hit = YES;
+            UpdateLIRS(addr_info);
             
             if(calculate_time){
                 time += _latency.bus_latency + _latency.hit_latency;
@@ -79,6 +87,7 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
         /* Hit */
         if(CacheHit(addr_info)){
             hit = YES;
+            UpdateLIRS(addr_info);
             
             if(_config.write_policy == WRITE_THROUGH){
                 /* write directly to lower layer */
@@ -232,7 +241,6 @@ int Cache::FoundEmptyLine(CacheAddress& addr_info){
         }
     }
     return NO;
-    
 }
 
 /* find LRU in set and store its index in addr_info.index */
@@ -265,6 +273,28 @@ void Cache::FindLFU(CacheAddress& addr_info){
     addr_info.index = pos;
 }
 
+void Cache::FindLIRS(CacheAddress& addr_info){
+    int pos = 0;
+    uint64_t max_IRR = 0;
+    uint64_t max_recency = 0;
+    CacheSet* cache_set = GetCacheSet(addr_info);
+    for(int i = 0; i < _config.associativity; ++i){
+        CacheLine line = *((cache_set->cache_lines) + i);
+        if(line.IRR > max_IRR || (line.IRR == max_IRR && line.recency > max_recency)){
+            max_IRR = line.IRR;
+            max_recency = line.recency;
+            pos = i;
+        }
+    }
+    addr_info.index = pos;
+}
+
+/* get the starting addr of the content in a line */
+uint64_t Cache::GetAddrOfLine(CacheAddress& addr_info){
+    return (addr_info.tag << (addr_info.set + addr_info.offset)) |
+    (addr_info.set << addr_info.offset);
+}
+
 /* store the new line into current cache, might not be replacement */
 void Cache::ReplaceLine(CacheAddress& addr_info, char* new_line, int& time){
     CacheLine* line = GetCacheLine(addr_info);
@@ -278,8 +308,7 @@ void Cache::ReplaceLine(CacheAddress& addr_info, char* new_line, int& time){
     /* old_line modified?(Only with WRITE_BACK policy) */
     if(line->valid == YES && (line->modified == YES && _config.write_policy == WRITE_BACK)){
         int lower_time, lower_hit;
-        uint64_t old_addr = (addr_info.tag << (addr_info.set + addr_info.offset)) |
-                            (addr_info.set << addr_info.offset);
+        uint64_t old_addr = GetAddrOfLine(addr_info);
         char* old_line = new char[_config.line_size];
         // memcpy((void*)old_line, (const void*)(line->line), _config.line_size);
         _lower->HandleRequest(old_addr, _config.line_size, WRITE, old_line, lower_hit, lower_time, YES);
@@ -288,29 +317,45 @@ void Cache::ReplaceLine(CacheAddress& addr_info, char* new_line, int& time){
     }
     
     /* replace with new line, set status */
+    InitializeLine(line);
+    SetLineValid(line, addr_info);
+}
+
+/* fill out certain fields when initialize lines */
+void Cache::InitializeLine(CacheLine* line){
     // memcpy((void*)(line->line), new_line, _config.line_size);
+    line->valid = NO;
+    line->modified = NO;
+    line->IRR = INF;
+    line->recency = 0;
+    line->visited_lines.clear();
+}
+
+/* Turn a line from invalid to valid */
+void Cache::SetLineValid(CacheLine* line, CacheAddress& addr_info){
     line->valid = YES;
     line->tag = addr_info.tag;
-    line->modified = NO;
     line->visit_cnt = 1;
+}
+
+void Cache::VisitLine(CacheLine* line){
+    line->time_stamp = _time_stamp;
+    _time_stamp += 1;
+    line->visit_cnt += 1;
 }
 
 /* read 'byte_num' bytes from cache and stores in 'content' */
 void Cache::ReadFromCache(CacheAddress& addr_info, int byte_num, char* content){
     CacheLine* line = GetCacheLine(addr_info);
     // memcpy((void*)content, (const void*)((line->line) + addr_info.offset), byte_num);
-    line->time_stamp = _time_stamp;
-    _time_stamp += 1;
-    line->visit_cnt += 1;
+    VisitLine(line);
 }
 
 /* store 'byte_num' bytes in content into cache */
 void Cache::WriteToCache(CacheAddress& addr_info, int byte_num, char* content){
     CacheLine* line = GetCacheLine(addr_info);
     // memcpy((void*)((line->line) + addr_info.offset), (const void*)content, byte_num);
-    line->time_stamp = _time_stamp;
-    line->visit_cnt += 1;
-    _time_stamp += 1;
+    VisitLine(line);
     line->modified = YES;
 }
 
@@ -331,11 +376,10 @@ void Cache::BuildCache(){
         for(int j = 0; j < _config.associativity; ++j){
             // _cache[i].cache_lines[j] is a CacheLine
             _cache[i].cache_lines[j].line = new char[_config.line_size];
-            _cache[i].cache_lines[j].valid = NO;
-            _cache[i].cache_lines[j].modified = NO;
+            InitializeLine(&(_cache[i].cache_lines[j]));
         }
     }
-    cout << "Cache set up!" << endl;
+//    cout << "Cache set up!" << endl;
 }
 
 void Cache::ReleaseCache(){
@@ -347,7 +391,7 @@ void Cache::ReleaseCache(){
         delete []_cache[i].cache_lines;
     }
     delete []_cache;
-    cout << "Cache released!" << endl;
+//    cout << "Cache released!" << endl;
 }
 
 void Cache::PrintSet(CacheAddress& addr_info){
@@ -382,6 +426,9 @@ void Cache::FinalCheck(){
 
 /* fetch the blocks that follows current block */
 void Cache::PrefetchStrategy(uint64_t addr){
+#ifndef PREFETCH
+    return;
+#endif
 //    cout << "In Prefetch()" << endl;
     uint64_t current_addr = addr & ~((1 << _offset_bit) - 1);  // the starting addr of current line addr is in
     int lower_hit, lower_time, i = 0;
@@ -396,13 +443,15 @@ void Cache::PrefetchStrategy(uint64_t addr){
             CacheSet* cache_set = GetCacheSet(addr_info);
             cache_set->visited_tags.insert(addr_info.tag);
         }
-//        i++;
+        //        i++;
     }
 }
 
 /* Meet bypass conditions or not */
 int Cache::BypassCondition(CacheAddress& addr_info){
+#ifndef BYPASS
     return NO;
+#endif
 //    cout << "In Bypass()" << endl;
     CacheSet* cache_set = GetCacheSet(addr_info);
     if(cache_set->visited_tags.find(addr_info.tag) != cache_set->visited_tags.end()){  // visited this line before
@@ -433,5 +482,42 @@ void Cache::FindReplacement(CacheAddress& addr_info){
     }
     else if(_config.replace_policy == LFU){
         FindLFU(addr_info);
+    }
+    else if(_config.replace_policy == LIRS){
+        FindLIRS(addr_info);
+    }
+}
+
+double Cache::AMAT(){
+    double miss_rate, hit_rate, ave_time;
+    miss_rate = CalculateMissRate();
+    hit_rate = 1 - miss_rate;
+    double _lower_amat = _lower->AMAT();
+    ave_time = hit_rate * _latency.hit_latency + miss_rate * _lower_amat;
+//    cout << "ave_time = " << ave_time << endl;
+//    cout << "Ave Hit Cost = " << hit_rate << " * " << _latency.hit_latency << " = " << hit_rate * _latency.hit_latency << endl;
+//    cout << "Ave Miss Cost = " << miss_rate << " * " << _lower_amat << " = " << miss_rate * _lower_amat << endl;
+    return ave_time;
+}
+
+/* cache hit and update IRR and recency */
+void Cache::UpdateLIRS(CacheAddress& addr_info){
+    CacheLine* line = GetCacheLine(addr_info);
+    line->IRR = line->visited_lines.size();
+    line->recency = 0;
+    line->visited_lines.clear();
+}
+
+/* update all cache lines' IRR and recency for a line visit */
+void Cache::UpdateAllLIRS(CacheAddress& addr_info){
+    cout << "[Cache]: Update all LIRS." << endl;
+    uint64_t old_addr = GetAddrOfLine(addr_info);
+    for(int i = 0; i < _config.set_num; ++i){
+        for(int j = 0; j < _config.associativity; ++j){
+            CacheLine* tmp_line = &(_cache[i].cache_lines[j]);
+            if(tmp_line->valid == YES){
+                tmp_line->visited_lines.insert(old_addr);
+            }
+        }
     }
 }

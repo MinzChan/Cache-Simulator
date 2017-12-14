@@ -25,30 +25,31 @@ typedef struct StorageLatency_ {
 } StorageLatency;
 
 class Storage {
-    public:
-        Storage() {}
-        ~Storage() {}
+public:
+    Storage() {}
+    ~Storage() {}
 
-        // Sets & Gets
-        void SetStats(StorageStats ss) { _stats = ss; }
-        void GetStats(StorageStats &ss) { ss = _stats; }
-        void SetLatency(StorageLatency sl) { _latency = sl; }
-        void GetLatency(StorageLatency &sl) { sl = _latency; }
+    // Sets & Gets
+    void SetStats(StorageStats ss) { _stats = ss; }
+    void GetStats(StorageStats &ss) { ss = _stats; }
+    void SetLatency(StorageLatency sl) { _latency = sl; }
+    void GetLatency(StorageLatency &sl) { sl = _latency; }
 
-        // Main access process
-        // [in]  addr: access address
-        // [in]  bytes: target number of bytes
-        // [in]  read: 0|1 for write|read
-        // [i|o] content: in|out data
-        // [out] hit: 0|1 for miss|hit
-        // [out] time: total access time
-        // [in] calculate_time: whether to calculate time of this visit or not.(prefetch does not need time)
-        virtual void HandleRequest(uint64_t addr, int bytes, int read, char *content,
-                                   int &hit, int &time, int calculate_time) = 0;
-
-    protected:
-        StorageStats _stats;
-        StorageLatency _latency;
+    // Main access process
+    // [in]  addr: access address
+    // [in]  bytes: target number of bytes
+    // [in]  read: 0|1 for write|read
+    // [i|o] content: in|out data
+    // [out] hit: 0|1 for miss|hit
+    // [out] time: total access time
+    // [in] calculate_time: whether to calculate time of this visit or not.(prefetch does not need time)
+    virtual void HandleRequest(uint64_t addr, int bytes, int read, char *content,
+                               int &hit, int &time, int calculate_time) = 0;
+    virtual double AMAT(){return 0;};
+    
+protected:
+    StorageStats _stats;
+    StorageLatency _latency;
 };
 
 #endif //CACHE_STORAGE_H_ 

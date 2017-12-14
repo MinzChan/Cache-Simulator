@@ -48,6 +48,9 @@ class Cache: public Storage {
             _time_stamp = 0;
             _total_visit = 0;
             _total_hit = 0;
+            _dirty_cnt = 0;
+            _write_hit = 0;
+            _replace_dirty_by_w = 0;
         }
     
         ~Cache(){
@@ -64,8 +67,12 @@ class Cache: public Storage {
         void HandleRequest(uint64_t addr, int bytes, int read,
                          char *content, int &hit, int &time);
         double CalculateMissRate() {
+            cout << "total visit: " << _total_visit << endl;
             return 1 - (double)_total_hit / _total_visit;
         }
+        int _dirty_cnt;
+        int _write_hit;
+        int _replace_dirty_by_w;
     
     private:
         CacheAddress SetAddrInfo(uint64_t addr);
@@ -73,7 +80,7 @@ class Cache: public Storage {
         int CacheHit(CacheAddress& addr_info);
         int FoundEmptyLine(CacheAddress& addr_info);
         void FindLRU(CacheAddress& addr_info);
-        void ReplaceLine(CacheAddress& addr_info, char* new_line, int& time);
+        void ReplaceLine(CacheAddress& addr_info, char* new_line, int& time, int read_or_write);
         void ReadFromCache(CacheAddress& addr_info, int byte_num, char* content);
         void WriteToCache(CacheAddress& addr_info, int byte_num, char* content);
         CacheLine* GetCacheLine(CacheAddress& addr_info);

@@ -91,20 +91,23 @@ void HandleTrace(const char* trace){
     char content[64];  // write content
     string request;
     ifstream fin;
+    int w_cnt = 0;
     
     fin.open(trace);
-    while(fin >> request >> dec >> addr){
+    while(fin >> request >> hex >> addr){
 //        cout << request << " " << dec << addr << endl;
         if(request == "r"){
             level1.HandleRequest(addr, 4, READ, content, hit, time);
         }
         else{
             level1.HandleRequest(addr, 4, WRITE, content, hit, time);
+            w_cnt += 1;
         }
         request_cnt += 1;
         hit_cnt += hit;
     }
     fin.close();
+    cout << "write number: " << w_cnt << endl;
 }
 
 int main(int argc, char * argv[]) {
@@ -126,9 +129,17 @@ int main(int argc, char * argv[]) {
     level1.GetStats(s);
     printf("Total L1 access time: %d(cycles)\n", s.access_time);
     cout << "L1 miss rate: " << level1.CalculateMissRate() * 100 << "%" << endl;
+    cout << "L1 dirty cnt: " << level1._dirty_cnt << endl;
+    cout << "L1 write hit: " << level1._write_hit << endl;
+    cout << "L1 replace dirty by write: " << level1._replace_dirty_by_w << endl;
+    
     level2.GetStats(s);
     printf("Total L2 access time: %d(cycles)\n", s.access_time);
     cout << "L2 miss rate: " << level2.CalculateMissRate() * 100 << "%" << endl;
+    cout << "L2 dirty cnt: " << level2._dirty_cnt << endl;
+    cout << "L2 write hit: " << level2._write_hit << endl;
+    cout << "L2 replace dirty by write: " << level2._replace_dirty_by_w << endl;
+    
 //    memory.GetStats(s);
 //    printf("Total Memory access time: %dns\n", s.access_time);
     printf("Total Memory access cnt: %d\n", memory._visit_cnt);

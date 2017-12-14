@@ -43,7 +43,7 @@ void Configure(){
     cfg1.line_size = 64;
     cfg1.write_policy = WRITE_BACK;
     cfg1.write_allocate_policy = WRITE_ALLOCATE;
-    cfg1.replace_policy = LFU;
+    cfg1.replace_policy = LRU;
     cfg1.prefetch_num = 2;
     
     l2.bus_latency = 6;
@@ -53,7 +53,7 @@ void Configure(){
     cfg2.line_size = 64;
     cfg2.write_policy = WRITE_BACK;
     cfg2.write_allocate_policy = WRITE_ALLOCATE;
-    cfg2.replace_policy = LFU;
+    cfg2.replace_policy = LRU;
     cfg2.prefetch_num = 4;
     
     level1.SetLatency(l1);
@@ -75,8 +75,8 @@ void HandleTrace(const char* trace){
     ifstream fin;
     
     fin.open(trace);
-    while(fin >> request >> dec >> addr){
-//        cout << request << " " << dec << addr << endl;
+    while(fin >> request >> hex >> addr){
+        cout << request << " " << hex << addr << endl;
         if(request == "r"){
             level1.HandleRequest(addr, 4, READ, content, hit, time, YES);
         }
@@ -108,12 +108,16 @@ int main(int argc, char * argv[]) {
     level1.GetStats(s);
     printf("Total L1 access time: %d(cycles)\n", s.access_time);
     cout << "L1 miss rate: " << level1.CalculateMissRate() * 100 << "%" << endl;
+    cout << "L1 AMAT: " << level1.AMAT() << endl;
     level2.GetStats(s);
     printf("Total L2 access time: %d(cycles)\n", s.access_time);
     cout << "L2 miss rate: " << level2.CalculateMissRate() * 100 << "%" << endl;
+    cout << "L2 AMAT: " << level2.AMAT() << endl;
+    
     //    memory.GetStats(s);
     //    printf("Total Memory access time: %dns\n", s.access_time);
     printf("Total Memory access cnt: %d\n", memory._visit_cnt);
+    cout << "Memory AMAT: " << memory.AMAT() << endl;
     cout << "Miss Rate: " << (1 - (float)hit_cnt / request_cnt) * 100 << "%" << endl;
     //    cout << "Miss time: " << request_cnt - hit_cnt << endl;
     return 0;

@@ -63,7 +63,7 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
 #endif
                 FindLRU(addr_info);
             }
-            ReplaceLine(addr_info, new_line, time);
+            ReplaceLine(addr_info, new_line, time, READ);
             
             delete []new_line;
         }
@@ -108,7 +108,7 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
 #endif
                     FindLRU(addr_info);
                 }
-                ReplaceLine(addr_info, new_line, time);
+                ReplaceLine(addr_info, new_line, time, WRITE);
                 WriteToCache(addr_info, byte_num, content);
                 time += _latency.bus_latency + _latency.hit_latency + lower_time;
                 _stats.access_time += _latency.bus_latency + _latency.hit_latency;
@@ -119,6 +119,7 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
                 _stats.access_time += time;
             }
         }
+        _write_hit += hit;
     }
     else{
         cerr << "[Cache]: Invalid operation. Expected 'READ' or 'WRITE'." << endl;
@@ -228,7 +229,7 @@ void Cache::FindLRU(CacheAddress& addr_info){
 }
 
 /* replace with new_line */
-void Cache::ReplaceLine(CacheAddress& addr_info, char* new_line, int& time){
+void Cache::ReplaceLine(CacheAddress& addr_info, char* new_line, int& time, int read_or_write){
     CacheLine* line = GetCacheLine(addr_info);
 
 #ifdef DEBUG
@@ -239,6 +240,8 @@ void Cache::ReplaceLine(CacheAddress& addr_info, char* new_line, int& time){
     
     /* old_line modified?(Only with WRITE_BACK policy) */
     if(line->valid == YES && (line->modified == YES && _config.write_policy == WRITE_BACK)){
+        _dirty_cnt += 1;
+        _replace_dirty_by_w += read_or_write;
         int lower_time, lower_hit;
         uint64_t old_addr = (addr_info.tag << (addr_info.set + addr_info.offset)) |
                             (addr_info.set << addr_info.offset);

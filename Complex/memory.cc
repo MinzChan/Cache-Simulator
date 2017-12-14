@@ -26,3 +26,6 @@ void Memory::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
     }
 }
 
+double Memory::AMAT(){
+    return _latency.hit_latency;
+}

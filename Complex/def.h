@@ -18,5 +18,6 @@
 
 #define LRU 0
 #define LFU 1
+#define LIRS 2
 
 #endif //CACHE_DEF_H_
