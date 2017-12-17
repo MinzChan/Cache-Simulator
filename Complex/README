@@ -1,7 +1,16 @@
 This file contains the code for a Cache Simulator.
 
 How to configure:
-	Change parameters in main.c: Configure().
+(1) Configure Cache
+	Change parameters and policies in main.c: Configure().
+(2) Select mode
+	Change macro in cache.cc to select mode.
+	- Naive Mode
+		Remove "#define PREFETCH" and "#define BYPASS".
+	- Prefetch
+		Set "#PREFETCH".
+	- Bypass
+		Set "BYPASS".
 
 How to run:
 (1)	$ sh run.sh

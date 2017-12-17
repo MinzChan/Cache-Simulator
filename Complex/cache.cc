@@ -36,11 +36,11 @@
 using namespace std;
 
 #define INF 10000000
-// #define DEBUG
+//#define DEBUG
 //#define LOG
 #define PREFETCH
-#define BYPASS
-#define USE_LIRS
+//#define BYPASS
+//#define USE_LIRS
 
 /* asked for 'byte_num' bytes starting from addr */
 void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
@@ -50,9 +50,9 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
     time = 0;
     CacheAddress addr_info = SetAddrInfo(addr);
     if(not_prefetch){
-#ifdef USE_LIRS
-        UpdateAllLIRS(addr_info);
-#endif
+        if(_config.replace_policy == LIRS){
+            UpdateAllLIRS(addr_info);
+        }
     }
     if(read_or_write == READ){
         /* Missed */
@@ -80,9 +80,9 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
         else{
             hit = YES;
             if(not_prefetch){
-#ifdef USE_LIRS
-                UpdateLIRS(addr_info);
-#endif
+                if(_config.replace_policy == LIRS){
+                        UpdateLIRS(addr_info);
+                }
             }
             if(not_prefetch){
                 time += _latency.bus_latency + _latency.hit_latency;
@@ -98,9 +98,9 @@ void Cache::HandleRequest(uint64_t addr, int byte_num, int read_or_write,
         if(CacheHit(addr_info)){
             hit = YES;
             if(not_prefetch){
-#ifdef USE_LIRS
-                UpdateLIRS(addr_info);
-#endif
+                if(_config.replace_policy == LIRS){
+                    UpdateLIRS(addr_info);
+                }
             }
             if(_config.write_policy == WRITE_THROUGH){
                 /* write directly to lower layer */
@@ -353,11 +353,11 @@ void Cache::InitializeLine(CacheLine* line){
     // memcpy((void*)(line->line), new_line, _config.line_size);
     line->valid = NO;
     line->modified = NO;
-#ifdef USE_LIRS
-    line->IRR = INF;
-    line->recency = 0;
-    line->visited_lines.clear();
-#endif
+    if(_config.replace_policy == LIRS){
+        line->IRR = INF;
+        line->recency = 0;
+        line->visited_lines.clear();
+    }
 }
 
 /* Turn a line from invalid to valid */
@@ -463,8 +463,22 @@ void Cache::PrefetchStrategy(uint64_t addr){
 #endif
     uint64_t current_addr = addr & ~((1 << _offset_bit) - 1);  // the starting addr of current line addr is in
     int lower_hit, lower_time, i = 0;
-    while(i < _config.prefetch_num){
+    while(i < (_config.prefetch_num >> 1) + 1){
         current_addr += _config.line_size;
+        CacheAddress addr_info = SetAddrInfo(current_addr);
+        if(!CacheHit(addr_info)){
+            LoadLineFromLower(current_addr, addr_info, lower_hit, lower_time, NO);
+            i++;
+            
+            /* record in visited_tags */
+            CacheSet* cache_set = GetCacheSet(addr_info);
+            cache_set->visited_tags.insert(addr_info.tag);
+        }
+    }
+    current_addr = addr & ~((1 << _offset_bit) - 1);  // the starting addr of current line addr is in
+    i = 0;
+    while(i < (_config.prefetch_num >> 1) - 1){
+        current_addr -= _config.line_size;
         CacheAddress addr_info = SetAddrInfo(current_addr);
         if(!CacheHit(addr_info)){
             LoadLineFromLower(current_addr, addr_info, lower_hit, lower_time, NO);
@@ -486,6 +500,9 @@ int Cache::BypassCondition(CacheAddress& addr_info){
 #ifdef LOG
     cout << "[" << _name << "]: In BypassCheck()" << endl;
 #endif
+    if(FoundEmptyLine(addr_info) == YES){
+        return NO;
+    }
     CacheSet* cache_set = GetCacheSet(addr_info);
     if(cache_set->visited_tags.find(addr_info.tag) != cache_set->visited_tags.end()){  // visited this line before
         return NO;

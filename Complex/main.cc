@@ -74,19 +74,21 @@ void HandleTrace(const char* trace){
     string request;
     ifstream fin;
     
-    fin.open(trace);
-    while(fin >> request >> hex >> addr){
-        // cout << request << " " << hex << addr << endl;
-        if(request == "r"){
-            level1.HandleRequest(addr, 4, READ, content, hit, time, YES);
-        }
-        else{
-            level1.HandleRequest(addr, 4, WRITE, content, hit, time, YES);
-        }
-        request_cnt += 1;
-        hit_cnt += hit;
+    for(int i = 0; i < 10; ++i){
+        fin.open(trace);
+            while(fin >> request >> hex >> addr){
+                // cout << request << " " << hex << addr << endl;
+                if(request == "r"){
+                    level1.HandleRequest(addr, 4, READ, content, hit, time, YES);
+                }
+                else{
+                    level1.HandleRequest(addr, 4, WRITE, content, hit, time, YES);
+                }
+                request_cnt += 1;
+                hit_cnt += hit;
+            }
+        fin.close();
     }
-    fin.close();
 }
 
 int main(int argc, char * argv[]) {
@@ -104,6 +106,8 @@ int main(int argc, char * argv[]) {
     Configure();
     HandleTrace(trace);
     
+    cout << "Statics about " << trace << ": " << endl;
+    cout << "-------------------" << endl;
     StorageStats s;
     level1.GetStats(s);
     printf("Total L1 access time: %d(cycles)\n", s.access_time);
@@ -120,5 +124,6 @@ int main(int argc, char * argv[]) {
     cout << "Memory AMAT: " << memory.AMAT() << endl;
     cout << "Miss Rate: " << (1 - (float)hit_cnt / request_cnt) * 100 << "%" << endl;
     //    cout << "Miss time: " << request_cnt - hit_cnt << endl;
+    cout << "========================================================" << endl;
     return 0;
 }
